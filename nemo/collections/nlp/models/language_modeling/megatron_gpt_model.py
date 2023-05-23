@@ -975,13 +975,17 @@ class MegatronGPTModel(MegatronBaseModel, TextGeneration):
         if self.cfg.get('transformer_engine', False):
             logging.info(f'Setting up transformer engine modules for tensor parallelism.')
             if self.cfg.get('megatron_amp_O2', 'False'):
+                # (@sudhakarsingh27: additional `module` key isn't needed. Is this a bug?)
                 # when using O2 additional module key is added that casts the weights
-                for layer in module.module.decoder.layers:
-                    layer.set_tensor_parallel_group(parallel_state.get_tensor_model_parallel_group())
-
+                for layer in module.decoder.layers:
+                    for mod in layer.modules():
+                        if hasattr(mod, "set_tensor_parallel_group"):
+                            mod.set_tensor_parallel_group(parallel_state.get_tensor_model_parallel_group())
             else:
                 for layer in module.decoder.layers:
-                    layer.set_tensor_parallel_group(parallel_state.get_tensor_model_parallel_group())
+                    for mod in layer.modules():
+                        if hasattr(mod, "set_tensor_parallel_group"):
+                            mod.set_tensor_parallel_group(parallel_state.get_tensor_model_parallel_group())
 
     def setup_transformer_engine_tp_groups(self):
         """ This should be called after model parallel groups have been initialized
